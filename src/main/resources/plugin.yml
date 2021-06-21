@@ -1,0 +1,13 @@
+name: DonorPerks
+version: 1.0.0
+main: ml.am2i9.donorperks.DonorPerks
+api-version: 1.17
+prefix: [ DonorPerks ]
+authors: [ AM2i9 ]
+description: Donor Perks for Minecraft server
+
+commands:
+  particles:
+    description: Donor particle command
+    usage: /<command>
+    permission: donor.particles
