@@ -211,6 +211,8 @@ public class Particles implements CommandExecutor, Listener {
 
         String uuid = player.getUniqueId().toString();
 
+        this.getPlayerParticleConfig().set(uuid, "--NONE");
+
         if (this.particleTasks.containsKey(uuid)){
             Bukkit.getScheduler().cancelTask(this.particleTasks.get(uuid));
         }
@@ -220,6 +222,11 @@ public class Particles implements CommandExecutor, Listener {
     public void startParticleTask(Player player) {
         // Get the interval of the players current particle
         String particleID = this.getPlayerParticleConfig().getString(player.getUniqueId().toString());
+
+        if (particleID.equals("--NONE")) {
+            return;
+        }
+
         double interval = this.particleConfig.getDouble(particleID + ".interval");
 
         // Start the bukkit task
