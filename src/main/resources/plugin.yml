@@ -1,5 +1,5 @@
 name: DonorPerks
-version: 1.0.0
+version: 1.0.1
 main: ml.am2i9.donorperks.DonorPerks
 api-version: 1.17
 prefix: DonorPerks
