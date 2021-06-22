@@ -63,7 +63,7 @@ public class Particles implements CommandExecutor, Listener {
         if (sender instanceof Player) {
             Player player = (Player) sender;
             if (args.length > 0) {
-                if (args[0].equals("reload")) {
+                if (args[0].equals("reload") && player.isOp()) {
                     this.loadParticles(this.plugin);
                     this.initializeMenu();
                     return true;
@@ -171,7 +171,6 @@ public class Particles implements CommandExecutor, Listener {
         } catch (InvalidConfigurationException | IOException e) {
             e.printStackTrace();
         }
-
     }
 
     // Save player config
