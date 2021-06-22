@@ -1,10 +1,7 @@
 package ml.am2i9.donorperks;
 
 import ml.am2i9.donorperks.DonorPerks;
-import org.bukkit.Bukkit;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.Particle;
+import org.bukkit.*;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.InvalidConfigurationException;
@@ -33,29 +30,36 @@ public class Particles implements CommandExecutor, Listener {
 
     private final DonorPerks plugin;
 
+    // Config files
     private File playerConfigFile;
     private FileConfiguration playerParticleConfig;
 
     private File particleConfigFile;
     private FileConfiguration particleConfig;
 
+    // Menu stuff
     private Inventory menu;
     private NamespacedKey particleIdKey;
 
+    // A list of currently active particle tags
     private Hashtable<String, Integer> particleTasks = new Hashtable<String, Integer>();
 
     public Particles(DonorPerks plugin) {
 
         this.plugin = plugin;
 
+        // Create particle_id tag for menu items
         this.particleIdKey = new NamespacedKey(this.plugin, "particle_id");
 
+        // Load configs
         this.loadParticles(plugin);
         this.loadPlayerParticleConfig(plugin);
 
+        // Create menu
         this.initializeMenu();
     }
 
+    // Particle command
     @Override
     public boolean onCommand(CommandSender sender, org.bukkit.command.Command command, String label, String[] args) {
         if (sender instanceof Player) {
@@ -63,6 +67,7 @@ public class Particles implements CommandExecutor, Listener {
             if (args.length > 0) {
                 if (args[0].equals("reload")) {
                     this.loadParticles(this.plugin);
+                    this.initializeMenu();
                     return true;
                 }
             }
@@ -71,6 +76,7 @@ public class Particles implements CommandExecutor, Listener {
         return true;
     }
 
+    // Event handlers
     @EventHandler
     public boolean onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
@@ -84,8 +90,59 @@ public class Particles implements CommandExecutor, Listener {
         return true;
     }
 
+    @EventHandler
+    public void onInventoryClick(final InventoryClickEvent e) {
+
+        if (e.getInventory() != menu) return;
+
+        e.setCancelled(true);
+
+        final ItemStack clickedItem = e.getCurrentItem();
+
+        if (clickedItem == null || clickedItem.getType().isAir()) return;
+
+        final Player player = (Player) e.getWhoClicked();
+
+        PersistentDataContainer container = clickedItem.getItemMeta().getPersistentDataContainer();
+
+        // Test for the `particle_id` tag on the clicked item
+        if(container.has(particleIdKey , PersistentDataType.STRING)) {
+
+            String particleID = container.get(particleIdKey, PersistentDataType.STRING);
+
+            if (particleID.equals("--PARTICLE_OFF")) {
+                this.stopPlayerParticle(player);
+            } else {
+                this.changePlayerParticle(player, particleID);
+            }
+            player.closeInventory();
+
+        }
+
+    }
+
+    @EventHandler
+    public void onInventoryClick(final InventoryDragEvent e) {
+
+        // Canceling dragging in the menu
+        if (e.getInventory().equals(menu)) {
+            e.setCancelled(true);
+        }
+
+    }
+
+    // Load configs and stored data
     public void loadParticles(DonorPerks plugin) {
+
         this.particleConfigFile = new File(plugin.getDataFolder(), "particles/particles.yml");
+
+        // Create directory and file if not exists
+        if (!this.particleConfigFile.exists()) {
+            try {
+                this.particleConfigFile.getParentFile().mkdirs();
+                this.particleConfigFile.createNewFile();
+            } catch ( IOException e ) {}
+        }
 
         this.particleConfig = new YamlConfiguration();
 
@@ -94,10 +151,20 @@ public class Particles implements CommandExecutor, Listener {
         } catch (InvalidConfigurationException | IOException e) {
             e.printStackTrace();
         }
+
     }
 
     public void loadPlayerParticleConfig(DonorPerks plugin) {
+
         this.playerConfigFile = new File(plugin.getDataFolder(), "particles/players.yml");
+
+        // Create directory and file if not exists
+        if (!this.playerConfigFile.exists()) {
+            try {
+                this.playerConfigFile.getParentFile().mkdirs();
+                this.playerConfigFile.createNewFile();
+            } catch ( IOException e ) {}
+        }
 
         this.playerParticleConfig = new YamlConfiguration();
 
@@ -106,9 +173,12 @@ public class Particles implements CommandExecutor, Listener {
         } catch (InvalidConfigurationException | IOException e) {
             e.printStackTrace();
         }
+
     }
 
+    // Save player config
     public void savePlayerParticleConfig(){
+
         try {
             this.playerParticleConfig.save(this.playerConfigFile);
         } catch (IOException e) {
@@ -116,6 +186,7 @@ public class Particles implements CommandExecutor, Listener {
         }
     }
 
+    // Getters for player and particle data
     public FileConfiguration getPlayerParticleConfig() {
         return this.playerParticleConfig;
     }
@@ -124,16 +195,19 @@ public class Particles implements CommandExecutor, Listener {
         return this.particleConfig;
     }
 
+    // Change the players particles
     public void changePlayerParticle(Player player, String particleID) {
 
         String uuid = player.getUniqueId().toString();
 
+        // Stopping and starting the task with the new particle and interval
         if (this.particleTasks.containsKey(uuid)){
             Bukkit.getScheduler().cancelTask(this.particleTasks.get(uuid));
         }
 
         this.getPlayerParticleConfig().set(uuid, particleID);
-        this.startParticleTask(player, this.getParticleConfig().getDouble(particleID + ".interval"));
+        this.startParticleTask(player);
+        this.savePlayerParticleConfig();
     }
 
     public void stopPlayerParticle(Player player) {
@@ -145,20 +219,28 @@ public class Particles implements CommandExecutor, Listener {
         }
     }
 
+    // Start the bukkit task loop to spawn the particle on the player
     public void startParticleTask(Player player) {
+        // Get the interval of the players current particle
         String particleID = this.getPlayerParticleConfig().getString(player.getUniqueId().toString());
-        this.startParticleTask(player, this.particleConfig.getDouble(particleID + ".interval"));
-    }
+        double interval = this.particleConfig.getDouble(particleID + ".interval");
 
-    public void startParticleTask(Player player, double interval) {
+        // Start the bukkit task
         int taskID = Bukkit.getScheduler().scheduleSyncRepeatingTask(this.plugin,
                 () -> this.showParticles(player), 0L, (long) (interval * 20));
+
+        // Save the taskID to the `particleTasks` hashtable, so we can access it later
         this.particleTasks.put(player.getUniqueId().toString(), taskID);
     }
 
+    // The bukkit task that spawns the particle
     public void showParticles(Player player) {
+
+        // Read info about the particle
         String particleID = this.getPlayerParticleConfig().getString(player.getUniqueId().toString());
         FileConfiguration config = getParticleConfig();
+
+        // Spawn the particle
         try {
             Particle effect = Particle.valueOf(config.getString(particleID + ".particle").toUpperCase());
             player.spawnParticle(effect, player.getLocation().add(0, .7, 0),
@@ -173,37 +255,48 @@ public class Particles implements CommandExecutor, Listener {
         }
     }
 
+    // Create particle menu
     public void initializeMenu() {
+
+        // Create a single chest inventory
         this.menu = Bukkit.createInventory(null, 27, "Particles");
         FileConfiguration config = getParticleConfig();
+
         for (String name : config.getKeys(false)) {
             try {
+
                 this.menu.addItem(createMenuItem(
                         Material.valueOf(config.getString(name + ".item").toUpperCase()),
                         name,
                         config.getString(name + ".display_name"),
+                        ChatColor.WHITE,
                         config.getString(name + ".description")));
+
             } catch (IllegalArgumentException e) {
                 e.printStackTrace();
             }
         }
 
-        this.menu.setItem(this.menu.getSize(), createMenuItem(
+        // Create the `turn off particles` item in last slot of the menu
+        this.menu.setItem(this.menu.getSize() - 1, createMenuItem(
                 Material.GRAY_DYE,
                 "--PARTICLE_OFF",
-                "Turn off particle",
+                "Turn off particles",
+                ChatColor.RED,
                 ""
         ));
     }
 
-    protected ItemStack createMenuItem(final Material material, final String id, final String name, final String... lore) {
+    // Nice little function to create a menu option
+    protected ItemStack createMenuItem(final Material material, final String id, final String name, final ChatColor color, final String... lore) {
         final ItemStack item = new ItemStack(material, 1);
         final ItemMeta meta = item.getItemMeta();
 
-        meta.setDisplayName(name);
+        meta.setDisplayName(color + name);
 
         meta.setLore(Arrays.asList(lore));
 
+        // Add the particle id to the items nbt, so we can use it to know which particle we need to set
         meta.getPersistentDataContainer().set(particleIdKey, PersistentDataType.STRING, id);
 
         item.setItemMeta(meta);
@@ -211,36 +304,4 @@ public class Particles implements CommandExecutor, Listener {
         return item;
     }
 
-    @EventHandler
-    public void onInventoryClick(final InventoryClickEvent e) {
-        if (e.getInventory() != menu) return;
-
-        e.setCancelled(true);
-
-        final ItemStack clickedItem = e.getCurrentItem();
-
-        if (clickedItem == null || clickedItem.getType().isAir()) return;
-
-        final Player player = (Player) e.getWhoClicked();
-
-        PersistentDataContainer container = clickedItem.getItemMeta().getPersistentDataContainer();
-
-        if(container.has(particleIdKey , PersistentDataType.STRING)) {
-            String particleID = container.get(particleIdKey, PersistentDataType.STRING);
-            if (particleID.equals("--PARTICLE_OFF")) {
-                this.stopPlayerParticle(player);
-            } else {
-                this.changePlayerParticle(player, particleID);
-            }
-            player.closeInventory();
-
-        }
-    }
-
-    @EventHandler
-    public void onInventoryClick(final InventoryDragEvent e) {
-        if (e.getInventory().equals(menu)) {
-            e.setCancelled(true);
-        }
-    }
 }
