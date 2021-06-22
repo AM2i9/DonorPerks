@@ -1,6 +1,5 @@
 package ml.am2i9.donorperks;
 
-import ml.am2i9.donorperks.DonorPerks;
 import org.bukkit.*;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -22,7 +21,6 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Hashtable;
 
