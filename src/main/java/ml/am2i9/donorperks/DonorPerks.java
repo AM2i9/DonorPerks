@@ -1,6 +1,5 @@
 package ml.am2i9.donorperks;
 
-import ml.am2i9.donorperks.particles.Particles;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -14,7 +13,7 @@ public class DonorPerks extends JavaPlugin {
 
     private File configPath = this.getDataFolder();
 
-    private Particles particlesPerk = new Particles();
+    private Particles particlesPerk;
 
     @Override
     public void onEnable() {
@@ -22,8 +21,7 @@ public class DonorPerks extends JavaPlugin {
         PluginManager pManager = getServer().getPluginManager();
 
         // Setup Particles;
-        particlesPerk.loadParticles(this);
-        particlesPerk.loadPlayerParticleConfig(this);
+        particlesPerk = new Particles(this);
         pManager.registerEvents(particlesPerk, this);
         this.getCommand("particles").setExecutor(particlesPerk);
 
@@ -32,7 +30,7 @@ public class DonorPerks extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        particlesPerk.savePlayerParticleConfig(this);
+        particlesPerk.savePlayerParticleConfig();
         this.log.info("Goodbye!");
     }
 
